@@ -1,14 +1,7 @@
-"""
-main.py - Lắp ráp toàn bộ hệ thống. Chạy trực tiếp (python main.py) hoặc import từng
-hàm vào notebook.
-
-    from main import setup, analyze
-    setup()
-    print(analyze("Tạo dataset sales mẫu, tên là sales_data"))
-"""
 from pathlib import Path
 import argparse
 import sys
+import os
 
 from llm_setup import build_gemini_llm
 from agents import build_react_llm, build_specialist, build_orchestrator, make_specialist_tool, make_analyze_fn
@@ -51,7 +44,9 @@ def load_input_file(file_path=None, dataset_name=None):
 
 def run_cli(analyze, file_path=None, dataset_name=None, tasks=None):
     """Run an interactive session that can load data and process multiple tasks."""
-    interactive = sys.stdin.isatty()
+    # Kaggle/Jupyter không có stdin kiểu terminal để input() nhận phím.
+    # Dùng --file/--task khi chạy script, hoặc gọi analyze(...) trong cell.
+    interactive = sys.stdin.isatty() and not os.environ.get("KAGGLE_KERNEL_RUN_TYPE")
     if file_path:
         load_input_file(file_path, dataset_name)
     elif interactive:
