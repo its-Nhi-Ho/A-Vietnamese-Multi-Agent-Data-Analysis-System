@@ -6,9 +6,10 @@ hàm vào notebook.
     setup()
     print(analyze("Tạo dataset sales mẫu, tên là sales_data"))
 """
+from pathlib import Path
+
 from llm_setup import build_gemini_llm
 from agents import build_react_llm, build_specialist, build_orchestrator, make_specialist_tool, make_analyze_fn
-from data_store import store
 from metrics import monitor
 
 from tools.data_tools import create_sample_dataset, create_custom_dataset, load_csv, load_excel, list_available_datasets
@@ -17,6 +18,46 @@ from tools.insight_tools import generate_insights
 from tools.viz_tools import create_visualization, create_distribution_report
 from tools.transform_tools import filter_data, aggregate_data, add_calculated_column
 from tools.report_tools import generate_summary_report, get_analysis_history
+
+
+def load_input_file():
+    """Prompt for a CSV/Excel path and load it into the shared data store."""
+    file_path = input("Đường dẫn CSV/XLSX (Enter để bỏ qua): ").strip().strip('"')
+    if not file_path:
+        return
+
+    suffix = Path(file_path).suffix.lower()
+    loader = load_csv if suffix == ".csv" else load_excel if suffix == ".xlsx" else None
+    if loader is None:
+        print("Chỉ hỗ trợ file .csv và .xlsx.")
+        return
+
+    default_name = Path(file_path).stem
+    dataset_name = input(f"Tên dataset [{default_name}]: ").strip() or default_name
+    result = loader.invoke(f"file_path={file_path}, dataset_name={dataset_name}")
+    print(result)
+
+
+def run_cli(analyze):
+    """Run an interactive session that can load data and process multiple tasks."""
+    print("\nNạp dữ liệu từ file để agent phân tích; Enter để bỏ qua (có thể dùng :load sau).")
+    load_input_file()
+    print(
+        "Nhập task, mỗi dòng một yêu cầu; gõ :load để nạp thêm file, "
+        "hoặc :quit để thoát.\n"
+        "Ví dụ: liệt kê dataset; tạo dataset mẫu/custom; describe/insight/correlation/"
+        "hypothesis/outlier; vẽ biểu đồ/phân phối; filter/aggregate/tính cột; "
+        "tạo report/xem lịch sử."
+    )
+    while True:
+        task = input("\nTask> ").strip()
+        if task.lower() in {":quit", "quit", "exit", "q"}:
+            break
+        if task.lower() == ":load":
+            load_input_file()
+            continue
+        if task:
+            print(analyze(task))
 
 
 def setup():
@@ -72,8 +113,5 @@ def setup():
 
 if __name__ == "__main__":
     analyze = setup()
-    print(analyze("Tạo dataset sales mẫu, tên là sales_data"))
-    store.debug()
-    print(analyze("Describe 'sales_data' và vẽ histogram của revenue"))
-    store.debug()
+    run_cli(analyze)
     print("\n" + monitor.dashboard())
