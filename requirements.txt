@@ -1,0 +1,11 @@
+google-genai
+langchain>=0.3
+langchain-core
+langchain-classic
+pandas
+numpy
+scipy
+matplotlib
+seaborn
+openpyxl
+excel-parser
