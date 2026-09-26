@@ -7,6 +7,8 @@ hàm vào notebook.
     print(analyze("Tạo dataset sales mẫu, tên là sales_data"))
 """
 from pathlib import Path
+import argparse
+import sys
 
 from llm_setup import build_gemini_llm
 from agents import build_react_llm, build_specialist, build_orchestrator, make_specialist_tool, make_analyze_fn
@@ -20,9 +22,14 @@ from tools.transform_tools import filter_data, aggregate_data, add_calculated_co
 from tools.report_tools import generate_summary_report, get_analysis_history
 
 
-def load_input_file():
+def load_input_file(file_path=None, dataset_name=None):
     """Prompt for a CSV/Excel path and load it into the shared data store."""
-    file_path = input("Đường dẫn CSV/XLSX (Enter để bỏ qua): ").strip().strip('"')
+    if file_path is None:
+        try:
+            file_path = input("Đường dẫn CSV/XLSX (Enter để bỏ qua): ")
+        except EOFError:
+            return
+    file_path = file_path.strip().strip('"')
     if not file_path:
         return
 
@@ -33,24 +40,47 @@ def load_input_file():
         return
 
     default_name = Path(file_path).stem
-    dataset_name = input(f"Tên dataset [{default_name}]: ").strip() or default_name
+    if dataset_name is None:
+        try:
+            dataset_name = input(f"Tên dataset [{default_name}]: ").strip() or default_name
+        except EOFError:
+            dataset_name = default_name
     result = loader.invoke(f"file_path={file_path}, dataset_name={dataset_name}")
     print(result)
 
 
-def run_cli(analyze):
+def run_cli(analyze, file_path=None, dataset_name=None, tasks=None):
     """Run an interactive session that can load data and process multiple tasks."""
-    print("\nNạp dữ liệu từ file để agent phân tích; Enter để bỏ qua (có thể dùng :load sau).")
-    load_input_file()
+    interactive = sys.stdin.isatty()
+    if file_path:
+        load_input_file(file_path, dataset_name)
+    elif interactive:
+        print("\nNạp dữ liệu từ file để agent phân tích; Enter để bỏ qua (có thể dùng :load sau).")
+        load_input_file()
+
+    if tasks:
+        for task in tasks:
+            print(analyze(task))
+
+    if not interactive:
+        if not tasks:
+            print("Không có terminal tương tác. Truyền --file và/hoặc --task; xem --help để biết cách dùng.")
+        return
+
     print(
         "Nhập task, mỗi dòng một yêu cầu; gõ :load để nạp thêm file, "
-        "hoặc :quit để thoát.\n"
+        "Enter hoặc :quit để thoát.\n"
         "Ví dụ: liệt kê dataset; tạo dataset mẫu/custom; describe/insight/correlation/"
         "hypothesis/outlier; vẽ biểu đồ/phân phối; filter/aggregate/tính cột; "
         "tạo report/xem lịch sử."
     )
     while True:
-        task = input("\nTask> ").strip()
+        try:
+            task = input("\nTask> ").strip()
+        except EOFError:
+            break
+        if not task:
+            break
         if task.lower() in {":quit", "quit", "exit", "q"}:
             break
         if task.lower() == ":load":
@@ -112,6 +142,12 @@ def setup():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Multi-agent data analysis CLI")
+    parser.add_argument("--file", help="CSV/XLSX path, e.g. /kaggle/input/data/file.csv")
+    parser.add_argument("--dataset-name", help="Dataset name (defaults to the file name)")
+    parser.add_argument("--task", action="append", help="Run a task (can be specified multiple times)")
+    args = parser.parse_args()
+
     analyze = setup()
-    run_cli(analyze)
+    run_cli(analyze, args.file, args.dataset_name, args.task)
     print("\n" + monitor.dashboard())
