@@ -219,9 +219,12 @@ def load_cases(path):
     return cases
 
 
-def run(cases_path, only_difficulty=None, only_category=None, verbose=False):
+def run(cases_path, only_difficulty=None, only_category=None, verbose=False, backend="gemma"):
     try:
-        from main import setup
+        if backend == "qwen":
+            from run_qwen import setup_qwen as setup
+        else:
+            from main import setup
         from data_store import store
         from metrics import monitor
         from config import CHART_OUTPUT_PATH
@@ -352,5 +355,12 @@ if __name__ == "__main__":
     parser.add_argument("--cases", default="eval/test_cases.jsonl")
     parser.add_argument("--only", dest="difficulty", default=None, help="easy|medium|hard")
     parser.add_argument("--category", default=None)
+    parser.add_argument("--backend", choices=["gemma", "qwen"], default="gemma",
+                        help="LLM backend to evaluate (default: gemma)")
     args = parser.parse_args()
-    run(args.cases, only_difficulty=args.difficulty, only_category=args.category)
+    run(
+        args.cases,
+        only_difficulty=args.difficulty,
+        only_category=args.category,
+        backend=args.backend,
+    )
